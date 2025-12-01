@@ -106,6 +106,46 @@ Mat drawGVFField(const Mat& image, const Mat& u, const Mat& v,
     return vis;
 }
 
+// --------------------------------------------------------
+// Simple 3x3 non-maximum suppression on the image
+// --------------------------------------------------------
+void nonMaxSuppression3x3(const Mat& inputImage, Mat& outputImage)
+{
+    CV_Assert(inputImage.type() == CV_32F);
+    outputImage = Mat::zeros(inputImage.size(), CV_32F);
+
+    for (int y = 1; y < inputImage.rows - 1; ++y)
+    {
+        const float* prev = inputImage.ptr<float>(y - 1);
+        const float* curr = inputImage.ptr<float>(y);
+        const float* next = inputImage.ptr<float>(y + 1);
+        float* out = outputImage.ptr<float>(y);
+
+        for (int x = 1; x < inputImage.cols - 1; ++x)
+        {
+            float val = curr[x];
+            bool isMax = true;
+
+            for (int dy = -1; dy <= 1 && isMax; ++dy)
+            {
+                const float* rowPtr = (dy == -1 ? prev : (dy == 0 ? curr : next));
+                for (int dx = -1; dx <= 1; ++dx)
+                {
+                    if (dy == 0 && dx == 0) continue;
+                    if (rowPtr[x + dx] >= val)
+                    {
+                        isMax = false;
+                        break;
+                    }
+                }
+            }
+
+            if (isMax)
+                out[x] = val;
+        }
+    }
+}
+
 int main() {
     cout << "OpenCV version: " << CV_VERSION << endl;
 
@@ -131,6 +171,38 @@ int main() {
     // Gradient Vector Flow (GVF)
     Mat u, v;
     computeGVF(fx, fy, u, v, 0.2f, 0.1f, 100);
+
+    // GVF magnitude
+    Mat gvfMagnitude;
+    magnitude(u, v, gvfMagnitude);
+
+    Mat nonMaxSuppressedMagnitude;
+    nonMaxSuppression3x3(gvfMagnitude, nonMaxSuppressedMagnitude);
+
+    // Thresholds high (thresholdHigh) and low (thresholdLow)
+    double minVal, maxVal;
+    minMaxLoc(nonMaxSuppressedMagnitude, &minVal, &maxVal);
+    float thresholdHigh = (float)(0.3 * maxVal);  // high threshold
+    float thresholdLow = (float)(0.15 * maxVal);  // low threshold
+
+    // Collect seed points (nonMaxSuppressedMagnitude > thresholdHigh)
+    vector<Point> seeds;
+    for (int y = 0; y < nonMaxSuppressedMagnitude.rows; ++y)
+    {
+        const float* row = nonMaxSuppressedMagnitude.ptr<float>(y);
+        for (int x = 0; x < nonMaxSuppressedMagnitude.cols; ++x)
+        {
+            if (row[x] > thresholdHigh)
+                seeds.emplace_back(x, y);
+        }
+    }
+
+    // Sort seeds by decreasing strength (nonMaxSuppressedMagnitude value)
+    sort(seeds.begin(), seeds.end(),
+        [&nonMaxSuppressedMagnitude](const Point& a, const Point& b)
+        {
+            return nonMaxSuppressedMagnitude.at<float>(a.y, a.x) > nonMaxSuppressedMagnitude.at<float>(b.y, b.x);
+        });
 
     imshow("Original", img);
     imshow("GVF Field (arrows) raster image", drawGVFField(img, u, v));
