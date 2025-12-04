@@ -71,7 +71,7 @@ void computeGVF(const Mat& fx, const Mat& fy,
 }
 
 // --------------------------------------------------------
-// Draw Gradient Flow Vector field
+// Draw Gradient Vector Flow field
 // --------------------------------------------------------
 Mat drawGVFField(const Mat& image, const Mat& u, const Mat& v,
     int step = 8, float scale = 5.0f, float magnitudeThreshold = 1e-3f)
@@ -146,6 +146,73 @@ void nonMaxSuppression3x3(const Mat& inputImage, Mat& outputImage)
     }
 }
 
+// --------------------------------------------------------
+// Place tiles on the image
+// --------------------------------------------------------
+bool placeTile(Mat& mosaic, Mat& occupied,
+    const Mat& sourceColor,
+    Point2f center,
+    float angleRadian,
+    int tileSize)
+{
+    float angleDegree = angleRadian * 180.0f / (float)CV_PI;
+
+    // Define rotated square
+    RotatedRect rotatedRectangle(center, Size2f((float)tileSize, (float)tileSize), angleDegree);
+    Point2f tileCornersFloat[4];
+    rotatedRectangle.points(tileCornersFloat);
+
+    // Convert to integer polygon
+    vector<Point> tilePolygon(4);
+    for (int i = 0; i < 4; ++i)
+        tilePolygon[i] = Point(cvRound(tileCornersFloat[i].x), cvRound(tileCornersFloat[i].y));
+
+    Rect tileBoundingBox = boundingRect(tilePolygon);
+
+    // Check bounds
+    if (tileBoundingBox.x < 0 || tileBoundingBox.y < 0 ||
+        tileBoundingBox.x + tileBoundingBox.width  > mosaic.cols ||
+        tileBoundingBox.y + tileBoundingBox.height > mosaic.rows)
+        return false;
+
+    // First pass: check overlap
+    for (int y = tileBoundingBox.y; y < tileBoundingBox.y + tileBoundingBox.height; ++y)
+    {
+        for (int x = tileBoundingBox.x; x < tileBoundingBox.x + tileBoundingBox.width; ++x)
+        {
+            if (occupied.at<uchar>(y, x))
+            {
+                if (pointPolygonTest(tilePolygon, Point2f((float)x, (float)y), false) >= 0)
+                    return false; // overlaps existing tile
+            }
+        }
+    }
+
+    // Compute tile color as mean in a small square around the center
+    int halfTileSize = tileSize / 2;
+    Rect tileRegion(
+        (int)center.x - halfTileSize, 
+        (int)center.y - halfTileSize, 
+        tileSize, tileSize);
+    tileRegion &= Rect(0, 0, sourceColor.cols, sourceColor.rows);
+    Scalar meanColor = mean(sourceColor(tileRegion));
+
+    // Draw tile
+    fillConvexPoly(mosaic, tilePolygon, meanColor);
+
+    // Mark occupied
+    for (int y = tileBoundingBox.y; y < tileBoundingBox.y + tileBoundingBox.height; ++y)
+    {
+        for (int x = tileBoundingBox.x; x < tileBoundingBox.x + tileBoundingBox.width; ++x)
+        {
+            if (pointPolygonTest(tilePolygon, Point2f((float)x, (float)y), false) >= 0)
+                occupied.at<uchar>(y, x) = 255;
+        }
+    }
+
+    return true;
+}
+
 int main() {
     cout << "OpenCV version: " << CV_VERSION << endl;
 
@@ -204,9 +271,44 @@ int main() {
             return nonMaxSuppressedMagnitude.at<float>(a.y, a.x) > nonMaxSuppressedMagnitude.at<float>(b.y, b.x);
         });
 
+    // Prepare mosaic canvas and occupancy mask
+    const int tileSize = 2;
+    Mat mosaic(img.size(), img.type(), Scalar(255, 255, 255));
+    Mat occupied(img.size(), CV_8U, Scalar(0));
+
+    // Phase 1: place tiles at seed points
+    for (const Point& p : seeds)
+    {
+        float ux = u.at<float>(p.y, p.x);
+        float vy = v.at<float>(p.y, p.x);
+        float vectorMagnitude = std::sqrt(ux * ux + vy * vy);
+        if (vectorMagnitude < 1e-4f) continue;
+
+        float tileAngle = atan2(vy, ux);
+        placeTile(mosaic, occupied, img, Point2f((float)p.x, (float)p.y),
+            tileAngle, tileSize);
+    }
+
+    // Phase 2: fill remaining regions by scanning image
+    for (int y = 0; y < img.rows; y += tileSize / 2)
+    {
+        for (int x = 0; x < img.cols; x += tileSize / 2)
+        {
+            float ux = u.at<float>(y, x);
+            float vy = v.at<float>(y, x);
+            float vectorMagnitude = std::sqrt(ux * ux + vy * vy);
+            if (vectorMagnitude < 1e-4f) continue;
+
+            float tileAngle = atan2(vy, ux);
+            placeTile(mosaic, occupied, img, Point2f((float)x, (float)y),
+                tileAngle, tileSize);
+        }
+    }
+
     imshow("Original", img);
     imshow("GVF Field (arrows) raster image", drawGVFField(img, u, v));
     imshow("GVF Field (arrows) equalized luminance", drawGVFField(equalizedLuminance, u, v));
+    imshow("Mosaic", mosaic);
 
     waitKey(0);
     return 0;
