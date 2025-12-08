@@ -76,7 +76,7 @@ The demo video (6–8 minutes) walks through:
 
 <video controls src="Project Presentation.mp4" title="Project Presentation"></video>
 
-[▶ Watch the demo](Project Presentation.mp4)
+[Watch the demo](Project%20Presentation.mp4)
 
 ---
 
