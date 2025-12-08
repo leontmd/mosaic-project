@@ -5,3 +5,6 @@ Gradient Vector Flow over raster image and equalized luminance image
 
 Place tiles and create a mosaic:
 ![alt text](Mosaic.png)
+
+Coverage:
+![alt text](coverage.png)

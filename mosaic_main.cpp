@@ -297,13 +297,58 @@ int main() {
             float ux = u.at<float>(y, x);
             float vy = v.at<float>(y, x);
             float vectorMagnitude = std::sqrt(ux * ux + vy * vy);
-            if (vectorMagnitude < 1e-4f) continue;
-
-            float tileAngle = atan2(vy, ux);
+            float tileAngle;
+            if (vectorMagnitude < 1e-6f)
+                tileAngle = 0.0f;
+            else
+                tileAngle = atan2(vy, ux);
             placeTile(mosaic, occupied, img, Point2f((float)x, (float)y),
                 tileAngle, tileSize);
         }
     }
+
+    // Phase 2: fill remaining regions by scanning image
+    for (int y = 0; y < img.rows; y += tileSize / 2)
+    {
+        for (int x = 0; x < img.cols; x += tileSize / 2)
+        {
+            float val = nonMaxSuppressedMagnitude.at<float>(y, x);
+
+            float tileAngle;
+            if (val < thresholdLow)
+            {
+                // really flat area -> neutral orientation
+                tileAngle = 0.0f;
+            }
+            else
+            {
+                // near an edge -> follow GVF
+                float ux = u.at<float>(y, x);
+                float vy = v.at<float>(y, x);
+                float vectorMagnitude = std::sqrt(ux * ux + vy * vy);
+
+                if (vectorMagnitude < 1e-6f)
+                    tileAngle = 0.0f;
+                else
+                    tileAngle = atan2(vy, ux);
+            }
+
+            placeTile(mosaic, occupied, img,
+                Point2f((float)x, (float)y),
+                tileAngle, tileSize);
+        }
+    }
+
+    // --- Coverage stats ---
+    int totalPixels = img.rows * img.cols;
+    int coveredPixels = countNonZero(occupied);
+    double coveragePct = 100.0 * (double)coveredPixels / (double)totalPixels;
+    double uncoveredPct = 100.0 - coveragePct;
+
+    cout << "Total pixels     : " << totalPixels << endl;
+    cout << "Covered pixels   : " << coveredPixels << endl;
+    cout << "Coverage         : " << coveragePct << " %" << endl;
+    cout << "Uncovered (gaps) : " << uncoveredPct << " %" << endl;
 
     imshow("Original", img);
     imshow("GVF Field (arrows) raster image", drawGVFField(img, u, v));
