@@ -74,6 +74,8 @@ The demo video (6–8 minutes) walks through:
 - Mosaic generation
 - Coverage results
 
+<video controls src="Project Presentation.mp4" title="Title"></video>
+
 ---
 
 ## 6. Reference

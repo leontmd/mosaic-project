@@ -214,7 +214,6 @@ bool placeTile(Mat& mosaic, Mat& occupied,
 }
 
 int main() {
-    cout << "OpenCV version: " << CV_VERSION << endl;
 
     Mat img = imread("luffy.jpg");
     if (img.empty())
@@ -272,7 +271,7 @@ int main() {
         });
 
     // Prepare mosaic canvas and occupancy mask
-    const int tileSize = 2;
+    const int tileSize = 3;
     Mat mosaic(img.size(), img.type(), Scalar(255, 255, 255));
     Mat occupied(img.size(), CV_8U, Scalar(0));
 
