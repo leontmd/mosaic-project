@@ -1,4 +1,10 @@
-﻿#include <iostream>
+// GVF-driven artificial mosaic implementation based on
+// "A Novel Artificial Mosaic Generation Technique Driven by Local Gradient Analysis"
+// by Battiato et al. (ICCS 2008).
+// Student name: Manh Dung Tran
+// Course: CS 587 - Advanced Topics in Computer Vision
+
+#include <iostream>
 #include <opencv2/opencv.hpp>
 
 using namespace cv;
