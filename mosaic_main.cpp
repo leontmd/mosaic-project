@@ -175,7 +175,7 @@ bool placeTile(Mat& mosaic, Mat& occupied,
         tileBoundingBox.y + tileBoundingBox.height > mosaic.rows)
         return false;
 
-    // First pass: check overlap
+    // Check overlap
     for (int y = tileBoundingBox.y; y < tileBoundingBox.y + tileBoundingBox.height; ++y)
     {
         for (int x = tileBoundingBox.x; x < tileBoundingBox.x + tileBoundingBox.width; ++x)
@@ -245,11 +245,11 @@ int main() {
     Mat nonMaxSuppressedMagnitude;
     nonMaxSuppression3x3(gvfMagnitude, nonMaxSuppressedMagnitude);
 
-    // Thresholds high (thresholdHigh) and low (thresholdLow)
+    // Thresholds high and low
     double minVal, maxVal;
     minMaxLoc(nonMaxSuppressedMagnitude, &minVal, &maxVal);
-    float thresholdHigh = (float)(0.3 * maxVal);  // high threshold
-    float thresholdLow = (float)(0.15 * maxVal);  // low threshold
+    float thresholdHigh = (float)(0.3 * maxVal);  
+    float thresholdLow = (float)(0.15 * maxVal);
 
     // Collect seed points (nonMaxSuppressedMagnitude > thresholdHigh)
     vector<Point> seeds;
@@ -298,7 +298,7 @@ int main() {
             float tileAngle;
             if (val < thresholdLow)
             {
-                // really flat area -> neutral orientation
+                // really flat area -> place tiles horizontally
                 tileAngle = 0.0f;
             }
             else
